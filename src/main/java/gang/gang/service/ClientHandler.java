@@ -1,4 +1,5 @@
 package gang.gang.service;
+import gang.gang.protocol.Parser;
 
 import java.io.*;
 import java.net.Socket;
@@ -27,7 +28,9 @@ public class ClientHandler implements Runnable {
             //tilføjer til arraylisten
             clientHandler.add(this);
             //udskriver en ny bruger et ankommet
-            broadcastMessage("SERVER: " + clientUsername + " has entered the chat!");
+//            broadcastMessage("SERVER: " + clientUsername + " has entered the chat!");
+            String welcomeMessage = Parser.formatServerMessage(clientUsername + " has entered the chat!");
+            broadcastMessage(welcomeMessage);
         } catch (IOException e) {
             closeEverything(socket,bufferedReader,bufferedWriter);
         }
@@ -42,7 +45,8 @@ public class ClientHandler implements Runnable {
             try {
                 //lytter efter beskeder fra brugere, a blocking operation
                 messageFromClient = bufferedReader.readLine();
-                broadcastMessage(messageFromClient);
+                String formattedMessage = Parser.formatChatMessage(clientUsername, messageFromClient);
+                broadcastMessage(formattedMessage);
             } catch (IOException e) {
                 closeEverything(socket,bufferedReader,bufferedWriter);
                 break;
@@ -54,7 +58,7 @@ public class ClientHandler implements Runnable {
         for (ClientHandler clientHandler : clientHandler) {
             try {
                 //så ens besked ikke bliver vist for en selv
-                if (!clientHandler.clientUsername.equals(clientUsername)) {
+//                if (!clientHandler.clientUsername.equals(clientUsername)) { Har udmarkeredet da det jo egentlig giver mening at have ens egne beskeder med? kan vi lige snakke om måske
                     //sender beskeden
                     clientHandler.bufferedWriter.write(messageToSend);
                     //okay så, den her betyder, jeg færdig med at sende data, ik vent på mere data.
@@ -62,7 +66,7 @@ public class ClientHandler implements Runnable {
                     clientHandler.bufferedWriter.newLine();
                     //burde bare kunne lave auto.flush
                     clientHandler.bufferedWriter.flush();
-                }
+//                }
             } catch (IOException e) {
                 closeEverything(socket,bufferedReader,bufferedWriter);
             }
@@ -71,7 +75,9 @@ public class ClientHandler implements Runnable {
     //bruger bliver fjernet fra arraylist
     public void removeClientHandler() {
         clientHandler.remove(this);
-        broadcastMessage("SERVER: " + clientUsername + " has left the chat!");
+//        broadcastMessage("SERVER: " + clientUsername + " has left the chat!");
+        String byebyeMessage = Parser.formatServerMessage(clientUsername + " has left the chat :( ");
+        broadcastMessage(byebyeMessage);
     }
 
     //sørger for alting lukker, intet unødvendigt åbent, CUSTOM EXCEPTION HANDLING? i believe

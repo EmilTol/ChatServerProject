@@ -1,4 +1,5 @@
 package gang.gang.net;
+import gang.gang.protocol.Parser;
 
 import java.io.*;
 import java.net.Socket;
@@ -33,7 +34,7 @@ public class Client {
                 String messageToSend = scanner.nextLine();
                 //ville nok være her vores logik fra message klasse ville blive brugt
                 //sender den besked brugeren har indtastet til ClientHandler som så Broadcaster til de andre brugere
-                bufferWriter.write(username + ": " + messageToSend);
+                bufferWriter.write(messageToSend); // Formatere det et andet sted
                 bufferWriter.newLine();
                 bufferWriter.flush();
             }
