@@ -19,7 +19,7 @@ public class Server {
 
                 //venter på brugere til connect
                 Socket socket = serverSocket.accept();
-                System.out.println("A new client has connected!");
+                System.out.println("A new client has connected :) " + socket.getInetAddress());
 
                 //hvert objekt af denne klasse kommunikere med en bruger
                 ClientHandler clientHandler = new ClientHandler(socket);

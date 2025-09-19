@@ -29,7 +29,7 @@ public class ClientHandler implements Runnable {
             clientHandler.add(this);
             //udskriver en ny bruger et ankommet
 //            broadcastMessage("SERVER: " + clientUsername + " has entered the chat!");
-            String welcomeMessage = Parser.formatServerMessage(clientUsername + " has entered the chat!");
+            String welcomeMessage = Parser.formatServerMessage(clientUsername + " has entered the chat :) ");
             broadcastMessage(welcomeMessage);
         } catch (IOException e) {
             closeEverything(socket,bufferedReader,bufferedWriter);

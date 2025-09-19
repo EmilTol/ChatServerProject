@@ -15,6 +15,6 @@ public class Parser {
 
    // Tager en server besked og formaterer den.
     public static String formatServerMessage(String message) {
-        return String.format("(: %s :)", message);
+        return String.format(" (: %s :) ", message);
     }
 }

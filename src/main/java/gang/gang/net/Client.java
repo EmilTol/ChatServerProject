@@ -85,7 +85,7 @@ public class Client {
         System.out.println("Enter your username for the group chat: ");
         //her vi sætter brugerens username
         String username = scanner.nextLine();
-        Socket socket = new Socket ("localhost", 1234);
+        Socket socket = new Socket ("192.168.0.101", 5555);
         Client client = new Client(socket,username);
         //begge er "blocking operations" fordi de har infinite while-loops, men de er hver deres thread så ja :D
         client.listenForMessage();
