@@ -7,40 +7,91 @@ import java.io.*;
 import java.net.Socket;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Map;
 
 public class ClientHandler implements Runnable {
 
     //holder styr på vores brugere, looper igennem når ny besked sendt så alle modtagere beskeden.
     //static fordi den skal tilhører klassen og ikke hvert objekt af klassen
+
     public static ArrayList<ClientHandler> clientHandler = new ArrayList<>();
+
     private Socket socket;
     private BufferedReader bufferedReader;
     private BufferedWriter bufferedWriter;
     private User user;
+    private String roomName;
+    private RoomService roomService;
 
-    public ClientHandler(Socket socket) {
+    public ClientHandler(Socket socket, RoomService roomService) {
         try {
             //gør at vores socket er ligemed hvad bliver sat til i serveren
             this.socket = socket;
+            this.roomService = roomService;
+
             //outputStreamWriter er en character stream
             //getOutputStream er en byte stream
-            this.bufferedWriter = new BufferedWriter ( new OutputStreamWriter(socket.getOutputStream()));
+            this.bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
             this.bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
             //sætter clientUsername som modtaget input fra bruger (deres første input)
             String username = bufferedReader.readLine();
             this.user = new User();
             this.user.setUsername(username);
+
             //tilføjer til arraylisten
             clientHandler.add(this);
+//            selectRoom();
+
             //udskriver en ny bruger et ankommet
 //            broadcastMessage("SERVER: " + clientUsername + " has entered the chat!");
-            Message welcomeMessage = new Message("SERVER", LocalDateTime.now(), "SERVER_INFO", username + " has entered the chat!");
+            Message welcomeMessage = new Message("SERVER", LocalDateTime.now(), "SERVER_INFO",
+                    username + " has entered the chat");
             broadcastMessage(Parser.formatToProtocol(welcomeMessage));
 
         } catch (IOException e) {
-            closeEverything(socket,bufferedReader,bufferedWriter);
+            closeEverything(socket, bufferedReader, bufferedWriter);
         }
     }
+
+//        private void selectRoom() throws IOException {
+//            while (true) {
+//                bufferedWriter.write("Join a room");
+//                bufferedWriter.newLine();
+//
+//                //looper igennem rum og udskriver til bruger
+//                for (Map.Entry<String,Integer> entry : roomService.getRoomStatus().entrySet()) {
+//                String roomName = entry.getKey();
+//                int count = entry.getValue();
+//                bufferedWriter.write(String.format("%s (%d/%d)",roomName, count, roomService.getMaxRoomSize()));
+//                bufferedWriter.newLine();
+//                }
+//
+//                bufferedWriter.write("Enter room name: ");
+//                bufferedWriter.newLine();
+//                bufferedWriter.flush();
+//
+//                String chosenRoom = bufferedReader.readLine();
+//
+//                System.out.println("DEBUG: chosenRoom = " + chosenRoom);
+//
+//                if (chosenRoom != null) chosenRoom = chosenRoom.trim();
+//
+//                if (roomService.addClientToRoom(chosenRoom, this)) {
+//                    this.roomName = chosenRoom;
+//                    break;
+//                }
+//                else {
+//                    bufferedWriter.write("Room is full or does not exist, Choose another.");
+//                    bufferedWriter.newLine();
+//                    bufferedWriter.flush();
+//                }
+//
+//            }
+//        }
+
+
+
 
     @Override
     public void run() {
@@ -86,6 +137,11 @@ public class ClientHandler implements Runnable {
 //        broadcastMessage("SERVER: " + clientUsername + " has left the chat!");
         Message byebyeMessage = new Message ("Server", LocalDateTime.now(), "SERVER_INFO", user.getUsername() + " has left the chat");
         broadcastMessage(Parser.formatToProtocol(byebyeMessage));
+    }
+
+    //bruges til at dele clientHandler instans/objekt af user
+    public User getUser() {
+        return user;
     }
 
     //sørger for alting lukker, intet unødvendigt åbent, CUSTOM EXCEPTION HANDLING? i believe

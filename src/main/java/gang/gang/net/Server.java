@@ -1,6 +1,7 @@
 package gang.gang.net;
 
 import gang.gang.service.ClientHandler;
+import gang.gang.service.RoomService;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -17,12 +18,14 @@ public class Server {
         try {
             while(!serverSocket.isClosed()) {
 
+                RoomService roomService = new RoomService();
+
                 //venter på brugere til connect
                 Socket socket = serverSocket.accept();
                 System.out.println("A new client has connected :) " + socket.getInetAddress());
 
                 //hvert objekt af denne klasse kommunikere med en bruger
-                ClientHandler clientHandler = new ClientHandler(socket);
+                ClientHandler clientHandler = new ClientHandler(socket, roomService);
 
                 Thread thread = new Thread(clientHandler);
                 thread.start();
@@ -43,7 +46,7 @@ public class Server {
     }
 
     public static void main(String[] args) throws IOException {
-        ServerSocket serverSocket = new ServerSocket(5555);
+        ServerSocket serverSocket = new ServerSocket(5556);
         Server server = new Server(serverSocket);
         server.startServer();
     }

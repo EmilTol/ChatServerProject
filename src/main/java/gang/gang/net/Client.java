@@ -27,12 +27,18 @@ public class Client {
     }
     public void sendMessage() {
         try {
+            Scanner scanner = new Scanner(System.in);
             //sender username til ClientHandler
             bufferWriter.write(user.getUsername());
             bufferWriter.newLine();
             bufferWriter.flush();
 
-            Scanner scanner = new Scanner(System.in);
+//            String chosenRoom = scanner.nextLine(); // rå input
+//            bufferWriter.write(chosenRoom);
+//            bufferWriter.newLine();
+//            bufferWriter.flush();
+
+
             while (socket.isConnected()) {
                 String messageToSend = scanner.nextLine();
 
@@ -59,15 +65,17 @@ public class Client {
 
                 while (socket.isConnected()) {
                     try {
-                        //printer hvad der bliver sendt fra serveren, broadcastMessage metoden
-                        msgFromGroupChat = bufferReader.readLine();
-                        if (msgFromGroupChat == null) break;
-                        Message message = Parser.parseFromProtocol(msgFromGroupChat);
+                        while (socket.isConnected() && (msgFromGroupChat = bufferReader.readLine()) != null) {
 
-                        String displayMessage = Parser.formatForDisplay(message);
-                        System.out.println(displayMessage);
+                            Message message = Parser.parseFromProtocol(msgFromGroupChat);
 
-
+                            if (message != null) {
+                                System.out.println(Parser.formatForDisplay(message));
+                            } else {
+                                // Hvis ikke parsebar, vis rå tekst (fx room prompts)
+                                System.out.println(msgFromGroupChat);
+                            }
+                        }
                     } catch (IOException e) {
                         closeEverything(socket,bufferReader,bufferWriter);
                         break;
@@ -103,7 +111,7 @@ public class Client {
         User user = new User();
         user.setUsername(username);
 
-        Socket socket = new Socket ("localhost", 5555);
+        Socket socket = new Socket ("localhost", 5556);
         Client client = new Client(socket, user);
         //begge er "blocking operations" fordi de har infinite while-loops, men de er hver deres thread så ja :D
         client.listenForMessage();
