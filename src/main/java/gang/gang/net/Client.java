@@ -1,8 +1,10 @@
 package gang.gang.net;
+import gang.gang.entity.Message;
 import gang.gang.protocol.Parser;
 
 import java.io.*;
 import java.net.Socket;
+import java.time.LocalDateTime;
 import java.util.Scanner;
 
 public class Client {
@@ -32,9 +34,13 @@ public class Client {
             Scanner scanner = new Scanner(System.in);
             while (socket.isConnected()) {
                 String messageToSend = scanner.nextLine();
+
+                Message message = new Message(username, LocalDateTime.now(), "TEXT", messageToSend);
+
+                String formattedMessage = Parser.formatToProtocol(message);
                 //ville nok være her vores logik fra message klasse ville blive brugt
                 //sender den besked brugeren har indtastet til ClientHandler som så Broadcaster til de andre brugere
-                bufferWriter.write(messageToSend); // Formatere det et andet sted
+                bufferWriter.write(formattedMessage); // Formatere det et andet sted
                 bufferWriter.newLine();
                 bufferWriter.flush();
             }
@@ -45,7 +51,7 @@ public class Client {
     //en block operation IG, så den får sin egen thread så resten ikke holder stille mens den venter på den her
     //så du stadig selv kan sende beskeder men dens også venter på beskeder fra andre brugere
     public void listenForMessage(){
-        new Thread(new Runnable() {
+        Thread thread = new Thread(new Runnable() { // Opførte sig funky, virker nu, men ved ikke hvorfor
             @Override
             public void run() {
                 String msgFromGroupChat;
@@ -54,14 +60,21 @@ public class Client {
                     try {
                         //printer hvad der bliver sendt fra serveren, broadcastMessage metoden
                         msgFromGroupChat = bufferReader.readLine();
-                        System.out.println(msgFromGroupChat);
+                        if (msgFromGroupChat == null) break;
+                        Message message = Parser.parseFromProtocol(msgFromGroupChat);
+
+                        String displayMessage = Parser.formatForDisplay(message);
+                        System.out.println(displayMessage);
+
+
                     } catch (IOException e) {
                         closeEverything(socket,bufferReader,bufferWriter);
+                        break;
                     }
                 }
             }
             //starter den så den kører, noget alla thread.start i serveren
-        }).start();
+        }); thread.start();
     }
     public void closeEverything(Socket socket, BufferedReader bufferReader, BufferedWriter bufferWriter) {
         try {

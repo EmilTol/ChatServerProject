@@ -1,8 +1,10 @@
 package gang.gang.service;
+import gang.gang.entity.Message;
 import gang.gang.protocol.Parser;
 
 import java.io.*;
 import java.net.Socket;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 
 public class ClientHandler implements Runnable {
@@ -29,8 +31,9 @@ public class ClientHandler implements Runnable {
             clientHandler.add(this);
             //udskriver en ny bruger et ankommet
 //            broadcastMessage("SERVER: " + clientUsername + " has entered the chat!");
-            String welcomeMessage = Parser.formatServerMessage(clientUsername + " has entered the chat!");
-            broadcastMessage(welcomeMessage);
+            Message welcomeMessage = new Message("SERVER", LocalDateTime.now(), "SERVER_INFO", clientUsername + " has entered the chat!");
+            broadcastMessage(Parser.formatToProtocol(welcomeMessage));
+
         } catch (IOException e) {
             closeEverything(socket,bufferedReader,bufferedWriter);
         }
@@ -43,10 +46,12 @@ public class ClientHandler implements Runnable {
         //mens vi er tilsluttet en bruger
         while (socket.isConnected()) {
             try {
-                //lytter efter beskeder fra brugere, a blocking operation
                 messageFromClient = bufferedReader.readLine();
-                String formattedMessage = Parser.formatChatMessage(clientUsername, messageFromClient);
-                broadcastMessage(formattedMessage);
+                if (messageFromClient == null) break;
+                //lytter efter beskeder fra brugere, a blocking operation
+//                messageFromClient = bufferedReader.readLine();
+//                String formattedMessage = Parser.formatChatMessage(clientUsername, messageFromClient);
+                broadcastMessage(messageFromClient);
             } catch (IOException e) {
                 closeEverything(socket,bufferedReader,bufferedWriter);
                 break;
@@ -76,8 +81,8 @@ public class ClientHandler implements Runnable {
     public void removeClientHandler() {
         clientHandler.remove(this);
 //        broadcastMessage("SERVER: " + clientUsername + " has left the chat!");
-        String byebyeMessage = Parser.formatServerMessage(clientUsername + " has left the chat :( ");
-        broadcastMessage(byebyeMessage);
+        Message byebyeMessage = new Message ("Server", LocalDateTime.now(), "Server info", clientUsername + "has left the chat");
+        broadcastMessage(Parser.formatToProtocol(byebyeMessage));
     }
 
     //sørger for alting lukker, intet unødvendigt åbent, CUSTOM EXCEPTION HANDLING? i believe
