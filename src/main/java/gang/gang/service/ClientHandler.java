@@ -1,5 +1,6 @@
 package gang.gang.service;
 import gang.gang.entity.Message;
+import gang.gang.entity.User;
 import gang.gang.protocol.Parser;
 
 import java.io.*;
@@ -15,7 +16,7 @@ public class ClientHandler implements Runnable {
     private Socket socket;
     private BufferedReader bufferedReader;
     private BufferedWriter bufferedWriter;
-    private String clientUsername;
+    private User user;
 
     public ClientHandler(Socket socket) {
         try {
@@ -26,12 +27,14 @@ public class ClientHandler implements Runnable {
             this.bufferedWriter = new BufferedWriter ( new OutputStreamWriter(socket.getOutputStream()));
             this.bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             //sætter clientUsername som modtaget input fra bruger (deres første input)
-            this.clientUsername = bufferedReader.readLine();
+            String username = bufferedReader.readLine();
+            this.user = new User();
+            this.user.setUsername(username);
             //tilføjer til arraylisten
             clientHandler.add(this);
             //udskriver en ny bruger et ankommet
 //            broadcastMessage("SERVER: " + clientUsername + " has entered the chat!");
-            Message welcomeMessage = new Message("SERVER", LocalDateTime.now(), "SERVER_INFO", clientUsername + " has entered the chat!");
+            Message welcomeMessage = new Message("SERVER", LocalDateTime.now(), "SERVER_INFO", username + " has entered the chat!");
             broadcastMessage(Parser.formatToProtocol(welcomeMessage));
 
         } catch (IOException e) {
@@ -81,7 +84,7 @@ public class ClientHandler implements Runnable {
     public void removeClientHandler() {
         clientHandler.remove(this);
 //        broadcastMessage("SERVER: " + clientUsername + " has left the chat!");
-        Message byebyeMessage = new Message ("Server", LocalDateTime.now(), "Server info", clientUsername + "has left the chat");
+        Message byebyeMessage = new Message ("Server", LocalDateTime.now(), "SERVER_INFO", user.getUsername() + " has left the chat");
         broadcastMessage(Parser.formatToProtocol(byebyeMessage));
     }
 
