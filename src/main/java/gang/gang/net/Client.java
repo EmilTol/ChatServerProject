@@ -1,5 +1,6 @@
 package gang.gang.net;
 import gang.gang.entity.Message;
+import gang.gang.entity.MessageType;
 import gang.gang.entity.User;
 import gang.gang.protocol.Parser;
 
@@ -42,7 +43,7 @@ public class Client {
             while (socket.isConnected()) {
                 String messageToSend = scanner.nextLine();
 
-                Message message = new Message(user.getUsername(), LocalDateTime.now(), "TEXT", messageToSend);
+                Message message = new Message(user.getUsername(), LocalDateTime.now(), MessageType.TEXT, messageToSend);
 
                 String formattedMessage = Parser.formatToProtocol(message);
                 //ville nok være her vores logik fra message klasse ville blive brugt

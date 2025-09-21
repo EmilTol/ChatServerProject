@@ -1,5 +1,6 @@
 package gang.gang.protocol;
 import gang.gang.entity.Message;
+import gang.gang.entity.MessageType;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -9,7 +10,7 @@ public class Parser {
     private static final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
 
     public static String formatToProtocol(Message message) {
-        return String.join("|" , message.getClientId(), message.getTimestamp().format(timeFormatter), message.getMessageType(), message.getPayload());
+        return String.join("|" , message.getClientId(), message.getTimestamp().format(timeFormatter), message.getMessageType().name(), message.getPayload());
     }
 
     public static Message parseFromProtocol(String protocolString) {
@@ -18,7 +19,7 @@ public class Parser {
 
         String clientId = parts[0];
         LocalDateTime timestamp = LocalDateTime.parse(parts[1], timeFormatter);
-        String messageType = parts[2];
+        MessageType messageType = MessageType.valueOf(parts[2].toUpperCase());
         String payload = parts[3];
 
         return new Message(clientId, timestamp, messageType, payload);
@@ -28,9 +29,9 @@ public class Parser {
         String time = message.getTimestamp().format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"));
 
         switch (message.getMessageType()) {
-            case "TEXT":
+            case TEXT:
                 return String.format("[%s] [%s] %s: %s", time, message.getMessageType(), message.getClientId(), message.getPayload());
-            case "SERVER_INFO":
+            case SERVER_INFO:
                 return String.format("(:  %s  :)", message.getPayload());
             default:
                 return "Ukendt beskedformat";
