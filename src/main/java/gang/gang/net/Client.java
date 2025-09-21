@@ -19,8 +19,11 @@ public class Client {
         try {
             this.socket = socket;
             this.user = user;
+
             this.bufferWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
             this.bufferReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+
         } catch (IOException e) {
             closeEverything(socket,bufferReader,bufferWriter);
         }
@@ -33,10 +36,10 @@ public class Client {
             bufferWriter.newLine();
             bufferWriter.flush();
 
-//            String chosenRoom = scanner.nextLine(); // rå input
-//            bufferWriter.write(chosenRoom);
-//            bufferWriter.newLine();
-//            bufferWriter.flush();
+            String chosenRoom = scanner.nextLine(); // rå input
+            bufferWriter.write(chosenRoom);
+            bufferWriter.newLine();
+            bufferWriter.flush();
 
 
             while (socket.isConnected()) {

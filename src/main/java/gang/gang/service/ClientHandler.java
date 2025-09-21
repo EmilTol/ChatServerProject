@@ -19,15 +19,19 @@ public class ClientHandler implements Runnable {
     private Socket socket;
     private BufferedReader bufferedReader;
     private BufferedWriter bufferedWriter;
+
     private User user;
     private String roomName;
-    private RoomService roomService;
 
-    public ClientHandler(Socket socket, RoomService roomService) {
+    private RoomService roomService;
+    private MessageService messageService;
+
+    public ClientHandler(Socket socket, RoomService roomService, MessageService messageService) {
         try {
             //gør at vores socket er ligemed hvad bliver sat til i serveren
             this.socket = socket;
             this.roomService = roomService;
+            this.messageService = messageService;
 
             //outputStreamWriter er en character stream
             //getOutputStream er en byte stream
@@ -40,55 +44,56 @@ public class ClientHandler implements Runnable {
             this.user.setUsername(username);
 
             //tilføjer til arraylisten
-            clientHandler.add(this);
-//            selectRoom();
+//            clientHandler.add(this);
+            selectRoom();
 
             //udskriver en ny bruger et ankommet
 //            broadcastMessage("SERVER: " + clientUsername + " has entered the chat!");
             Message welcomeMessage = new Message("SERVER", LocalDateTime.now(), "SERVER_INFO",
                     username + " has entered the chat");
-            broadcastMessage(Parser.formatToProtocol(welcomeMessage));
+            messageService.sendMessageToRoom(roomName, Parser.formatToProtocol(welcomeMessage), this);
+//            broadcastMessage(Parser.formatToProtocol(welcomeMessage));
 
         } catch (IOException e) {
             closeEverything(socket, bufferedReader, bufferedWriter);
         }
     }
 
-//        private void selectRoom() throws IOException {
-//            while (true) {
-//                bufferedWriter.write("Join a room");
-//                bufferedWriter.newLine();
-//
-//                //looper igennem rum og udskriver til bruger
-//                for (Map.Entry<String,Integer> entry : roomService.getRoomStatus().entrySet()) {
-//                String roomName = entry.getKey();
-//                int count = entry.getValue();
-//                bufferedWriter.write(String.format("%s (%d/%d)",roomName, count, roomService.getMaxRoomSize()));
-//                bufferedWriter.newLine();
-//                }
-//
-//                bufferedWriter.write("Enter room name: ");
-//                bufferedWriter.newLine();
-//                bufferedWriter.flush();
-//
-//                String chosenRoom = bufferedReader.readLine();
-//
-//                System.out.println("DEBUG: chosenRoom = " + chosenRoom);
-//
-//                if (chosenRoom != null) chosenRoom = chosenRoom.trim();
-//
-//                if (roomService.addClientToRoom(chosenRoom, this)) {
-//                    this.roomName = chosenRoom;
-//                    break;
-//                }
-//                else {
-//                    bufferedWriter.write("Room is full or does not exist, Choose another.");
-//                    bufferedWriter.newLine();
-//                    bufferedWriter.flush();
-//                }
-//
-//            }
-//        }
+        private void selectRoom() throws IOException {
+            while (true) {
+                bufferedWriter.write("Join a room");
+                bufferedWriter.newLine();
+
+                //looper igennem rum og udskriver til bruger
+                for (Map.Entry<String,Integer> entry : roomService.getRoomStatus().entrySet()) {
+                String roomName = entry.getKey();
+                int count = entry.getValue();
+                bufferedWriter.write(String.format("%s (%d/%d)",roomName, count, roomService.getMaxRoomSize()));
+                bufferedWriter.newLine();
+                }
+
+                bufferedWriter.write("Enter room name: ");
+                bufferedWriter.newLine();
+                bufferedWriter.flush();
+
+                String chosenRoom = bufferedReader.readLine();
+
+                System.out.println("DEBUG: chosenRoom = " + chosenRoom);
+
+                if (chosenRoom != null) chosenRoom = chosenRoom.trim();
+
+                if (roomService.addClientToRoom(chosenRoom, this)) {
+                    this.roomName = chosenRoom;
+                    break;
+                }
+                else {
+                    bufferedWriter.write("Room is full or does not exist, Choose another.");
+                    bufferedWriter.newLine();
+                    bufferedWriter.flush();
+                }
+
+            }
+        }
 
 
 
@@ -97,46 +102,47 @@ public class ClientHandler implements Runnable {
     public void run() {
         String messageFromClient;
 
-        //mens vi er tilsluttet en bruger
-        while (socket.isConnected()) {
-            try {
-                messageFromClient = bufferedReader.readLine();
-                if (messageFromClient == null) break;
-                //lytter efter beskeder fra brugere, a blocking operation
-//                messageFromClient = bufferedReader.readLine();
-//                String formattedMessage = Parser.formatChatMessage(clientUsername, messageFromClient);
-                broadcastMessage(messageFromClient);
-            } catch (IOException e) {
-                closeEverything(socket,bufferedReader,bufferedWriter);
-                break;
+        try {
+            while ((messageFromClient = bufferedReader.readLine()) != null) {
+                messageService.sendMessageToRoom(roomName, messageFromClient, this);
             }
-        }
+        }  catch (IOException e) {
+            System.out.println("just testing");
+        }  finally {
+        // Fjerner klienten fra rummet og sender farvel-besked
+        removeClientHandler();
     }
-    public void broadcastMessage(String messageToSend) {
-        //looper igennem vores arraylist af brugere
-        for (ClientHandler clientHandler : clientHandler) {
+
+
+    }
+    public void sendMessage(String message) {
+
             try {
-                //så ens besked ikke bliver vist for en selv
-//                if (!clientHandler.clientUsername.equals(clientUsername)) { Har udmarkeredet da det jo egentlig giver mening at have ens egne beskeder med? kan vi lige snakke om måske
-                    //sender beskeden
-                    clientHandler.bufferedWriter.write(messageToSend);
-                    //okay så, den her betyder, jeg færdig med at sende data, ik vent på mere data.
-                    //svarer til at trykke på enter
-                    clientHandler.bufferedWriter.newLine();
-                    //burde bare kunne lave auto.flush
-                    clientHandler.bufferedWriter.flush();
-//                }
+                    bufferedWriter.write(message);
+                    bufferedWriter.newLine();
+                    bufferedWriter.flush();
+
             } catch (IOException e) {
                 closeEverything(socket,bufferedReader,bufferedWriter);
             }
-        }
+
     }
     //bruger bliver fjernet fra arraylist
     public void removeClientHandler() {
-        clientHandler.remove(this);
-//        broadcastMessage("SERVER: " + clientUsername + " has left the chat!");
-        Message byebyeMessage = new Message ("Server", LocalDateTime.now(), "SERVER_INFO", user.getUsername() + " has left the chat");
-        broadcastMessage(Parser.formatToProtocol(byebyeMessage));
+        try {
+            Message byebyeMessage = new Message("Server", LocalDateTime.now(), "SERVER_INFO",
+                    user.getUsername() + " has left the chat");
+            messageService.sendMessageToRoom(roomName, Parser.formatToProtocol(byebyeMessage), this);
+
+
+            roomService.removeClientFromRoom(roomName, this);
+
+
+            closeEverything(socket, bufferedReader, bufferedWriter);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     //bruges til at dele clientHandler instans/objekt af user
@@ -146,7 +152,6 @@ public class ClientHandler implements Runnable {
 
     //sørger for alting lukker, intet unødvendigt åbent, CUSTOM EXCEPTION HANDLING? i believe
     public void closeEverything(Socket socket, BufferedReader bufferedReader, BufferedWriter bufferedWriter) {
-        removeClientHandler();
         try {
             if (bufferedReader != null) {
                 bufferedReader.close();
