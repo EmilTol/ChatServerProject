@@ -8,7 +8,12 @@ import java.io.*;
 import java.net.Socket;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.net.ServerSocket;
+import java.net.Socket;
+
+import static java.lang.System.in;
 
 public class ClientHandler implements Runnable {
 
@@ -26,6 +31,7 @@ public class ClientHandler implements Runnable {
 
     private RoomService roomService;
     private MessageService messageService;
+    private FileService fileService;
 
     public ClientHandler(Socket socket, RoomService roomService, MessageService messageService) {
         try {
@@ -33,6 +39,7 @@ public class ClientHandler implements Runnable {
             this.socket = socket;
             this.roomService = roomService;
             this.messageService = messageService;
+            this.fileService = new FileService();
 
             //outputStreamWriter er en character stream
             //getOutputStream er en byte stream
@@ -40,20 +47,22 @@ public class ClientHandler implements Runnable {
             this.bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
             //sætter clientUsername som modtaget input fra bruger (deres første input)
-            String username = bufferedReader.readLine();
+//            String username = bufferedReader.readLine();
             this.user = new User();
-            this.user.setUsername(username);
+//            this.user.setUsername(username);
 
-            //tilføjer til arraylisten
-//            clientHandler.add(this);
-            selectRoom();
+//            //tilføjer til arraylisten
+////            clientHandler.add(this);
+//            selectRoom();
+//
+//            //udskriver en ny bruger et ankommet
+////            broadcastMessage("SERVER: " + clientUsername + " has entered the chat!");
+//            Message welcomeMessage = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO,
+//                    username + " has entered the chat");
+//            messageService.sendMessageToRoom(roomName, Parser.formatToProtocol(welcomeMessage), this);
+////            broadcastMessage(Parser.formatToProtocol(welcomeMessage));
 
-            //udskriver en ny bruger et ankommet
-//            broadcastMessage("SERVER: " + clientUsername + " has entered the chat!");
-            Message welcomeMessage = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO,
-                    username + " has entered the chat");
-            messageService.sendMessageToRoom(roomName, Parser.formatToProtocol(welcomeMessage), this);
-//            broadcastMessage(Parser.formatToProtocol(welcomeMessage));
+        // blev nødt til at flytte det væk herfra da det blokerede for at andre kunne tilslutte et rum.
 
         } catch (IOException e) {
             closeEverything(socket, bufferedReader, bufferedWriter);
@@ -96,19 +105,44 @@ public class ClientHandler implements Runnable {
             }
         }
 
-
+//messageService.sendMessageToRoom(roomName, messageFromClient, this);
 
 
     @Override
     public void run() {
-        String messageFromClient;
-
         try {
-            while ((messageFromClient = bufferedReader.readLine()) != null) {
-                messageService.sendMessageToRoom(roomName, messageFromClient, this);
+            String username = bufferedReader.readLine(); // Læser brugerens input, hvilket er username
+            if (username == null) {return;}
+            this.user.setUsername(username);
+            selectRoom(); //Starter selectRoom metode
+
+            //Opretter og sender en velkomstbesked til brugeren
+            Message welcomeMessage = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO, user.getUsername() + " has entered the chat");
+            messageService.sendMessageToRoom(roomName, Parser.formatToProtocol(welcomeMessage), this);
+
+            String messageFromClient;
+            while ((messageFromClient = bufferedReader.readLine()) != null) { //Løkke der køre og forsætter så længe klienten er forbundet og sender beskerder
+                Message message = Parser.parseFromProtocol(messageFromClient); // Omdanner beskedet til et struktureret besked objekt
+                if ( message == null){
+                    System.out.println("Modtog ugyldig besked fra: " + user.getUsername());
+                    continue;
+                }
+                switch (message.getMessageType()) { // Sortere beskeder basseret på type
+                    case TEXT:
+                        messageService.sendMessageToRoom(roomName, messageFromClient, this);
+                        break;
+                    case FILE_TRANSFER: // Håndtere filoverførsel i en ny tråd, så det ikke fucker med chatten ( den smed brugeren ud hvis man ikke gør det )
+                        new Thread(() -> handleFileTransferRequest(message)).start();
+                        break;
+
+                    default:
+                        System.out.println("Modtog ugyldig besked :( " + message.getMessageType());
+                        break;
+                }
             }
         }  catch (IOException e) {
-            System.out.println("just testing");
+            String username = (user != null && user.getUsername() != null) ? user.getUsername() : "en ny klient";
+            System.out.println("Forbindelsen til " + username + " blev afbrudt.");
         }  finally {
         // Fjerner klienten fra rummet og sender farvel-besked
         removeClientHandler();
@@ -116,6 +150,36 @@ public class ClientHandler implements Runnable {
 
 
     }
+
+    private void handleFileTransferRequest(Message requestMessage) {
+        try (ServerSocket tempServerSocket = new ServerSocket(0)) { // Sygt smart, windows giver os en ledig port da vi skriver 0. Så vi behøver ikke tage stilling til det.
+            int port = tempServerSocket.getLocalPort(); // tager den port vi får givet af windows
+            String[] fileInfo = requestMessage.getPayload().split("\\|"); // deler vores payload i 2, ja, vi gør det 2 steder, fixer på et andet tidspunkt.
+            String fileName = fileInfo[0];
+            long fileSize = Long.parseLong(fileInfo[1]);
+
+            // Send en "grønt lys" besked tilbage til KUN den anmodende klient
+            Message goAheadMessage = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO, "START_UPLOAD::" + port);
+            this.sendMessage(Parser.formatToProtocol(goAheadMessage));
+
+
+            tempServerSocket.setSoTimeout(10000); // 10 sekunders timer, som beskriver hvor længe vi vil vente på klienten forbinder til den nye port.
+
+            try (Socket fileSocket = tempServerSocket.accept()) { // Acceptere den nye forbindelse fra klienten
+                System.out.println("Modtager fil '" + fileName + "' på midlertidig port " + port);
+                fileService.receiveFile(fileSocket.getInputStream(), fileName, fileSize); // smider ansvaret over til fileService
+
+                Message confirmation = new Message(user.getUsername(), LocalDateTime.now(), MessageType.FILE_TRANSFER, fileName + "|" + fileSize); //Semder til hele rummet at filen er sendt
+                messageService.sendMessageToRoom(roomName, Parser.formatToProtocol(confirmation), this);
+            }
+
+        } catch (IOException e) {
+            System.out.println("Fejl under oprettelse af midlertidig fil-server: " + e.getMessage()); // his noget går galt, f.eks timeout
+            Message errorMsg = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO, "Filoverførsel fejlede for " + user.getUsername());
+            this.sendMessage(Parser.formatToProtocol(errorMsg)); // send besked til brugeren om at det fejlede
+        }
+    }
+
     public void sendMessage(String message) {
 
             try {
@@ -124,7 +188,7 @@ public class ClientHandler implements Runnable {
                     bufferedWriter.flush();
 
             } catch (IOException e) {
-                closeEverything(socket,bufferedReader,bufferedWriter);
+                closeEverything(socket,null,bufferedWriter);
             }
 
     }
@@ -139,7 +203,7 @@ public class ClientHandler implements Runnable {
             roomService.removeClientFromRoom(roomName, this);
 
 
-            closeEverything(socket, bufferedReader, bufferedWriter);
+            closeEverything(socket, null, bufferedWriter);
 
         } catch (Exception e) {
             e.printStackTrace();

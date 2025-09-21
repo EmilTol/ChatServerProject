@@ -25,14 +25,23 @@ public class Parser {
         return new Message(clientId, timestamp, messageType, payload);
     }
 
-    public static String formatForDisplay(Message message) {
+    public static String formatForDisplay(Message message) { // Formattere vores Message objekt så det står som vi vil have det
         String time = message.getTimestamp().format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"));
 
-        switch (message.getMessageType()) {
-            case TEXT:
+        switch (message.getMessageType()) { // Tjekker vores messageType og formaterer den så det passer med typen
+            case TEXT: // Normale beskeder
                 return String.format("[%s] [%s] %s: %s", time, message.getMessageType(), message.getClientId(), message.getPayload());
-            case SERVER_INFO:
+            case SERVER_INFO: // Server beskeder, f.eks hvis en person tilslutter
                 return String.format("(:  %s  :)", message.getPayload());
+            case FILE_TRANSFER: // File overførsel, specielt ved den er at den deler payload i 2, navn og størrelse
+                String[] fileInfo = message.getPayload().split("\\|");
+                if (fileInfo.length == 2) {
+                    String fileName = fileInfo[0];
+                    String fileSize = fileInfo[1];
+                    return String.format("[%s] [FILE] %s sender fil: %s (%s bytes)", time, message.getClientId(), fileName, fileSize);
+                } else {
+                    return String.format("[%s] [FILE] %s startede en filoverførsel.", time, message.getClientId());
+                }
             default:
                 return "Ukendt beskedformat";
         }

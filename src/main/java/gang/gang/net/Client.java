@@ -3,9 +3,13 @@ import gang.gang.entity.Message;
 import gang.gang.entity.MessageType;
 import gang.gang.entity.User;
 import gang.gang.protocol.Parser;
+import gang.gang.service.ClientHandler;
+import gang.gang.service.CommandService;
 
 import java.io.*;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.Scanner;
 
@@ -15,6 +19,8 @@ public class Client {
     private BufferedReader bufferReader;
     private BufferedWriter bufferWriter;
     private User user;
+    private CommandService commandService;
+    private String pendingFilePath;
 
     public Client(Socket socket, User user) {
         try {
@@ -24,11 +30,24 @@ public class Client {
             this.bufferWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
             this.bufferReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
+            this.commandService = new CommandService(this);
+
 
         } catch (IOException e) {
             closeEverything(socket,bufferReader,bufferWriter);
         }
     }
+
+    public User getUser() {
+        return user;
+    }
+    public Socket getSocket() {
+        return socket;
+    }
+    public void setPendingFilePath(String path) {
+        this.pendingFilePath = path;
+    }
+
     public void sendMessage() {
         try {
             Scanner scanner = new Scanner(System.in);
@@ -44,21 +63,35 @@ public class Client {
 
 
             while (socket.isConnected()) {
-                String messageToSend = scanner.nextLine();
-
-                Message message = new Message(user.getUsername(), LocalDateTime.now(), MessageType.TEXT, messageToSend);
-
-                String formattedMessage = Parser.formatToProtocol(message);
-                //ville nok være her vores logik fra message klasse ville blive brugt
-                //sender den besked brugeren har indtastet til ClientHandler som så Broadcaster til de andre brugere
-                bufferWriter.write(formattedMessage); // Formatere det et andet sted
-                bufferWriter.newLine();
-                bufferWriter.flush();
+                String input = scanner.nextLine();
+                if (input.startsWith("/")) {
+                    commandService.execute(input);
+                } else {
+                    Message message = new Message(user.getUsername(), LocalDateTime.now(), MessageType.TEXT, input);
+                    sendProtocolMessage(message);
+                }
             }
         } catch (IOException e) {
             closeEverything(socket,bufferReader,bufferWriter);
         }
     }
+
+    public void sendProtocolMessage(Message message) { //Hjælpe metode til at sende beskeder
+        try {
+            // Omdanner det strukturerede Message-objekt til en simpel tekststreng (f.eks. "bruger|tid|TEKST|hej").
+            String formattedMessage = Parser.formatToProtocol(message);
+            // Skriver den formaterede streng til vores output-buffer.
+            bufferWriter.write(formattedMessage);
+            // Tilføjer en ny linje, så serverens readLine() ved, at beskeden er færdig.
+            bufferWriter.newLine();
+            // Tømmer bufferen og sikrer, at beskeden sendes over netværket med det samme.
+            bufferWriter.flush();
+        } catch (IOException e) {
+            System.out.println("Kunne ikke sende besked");
+            closeEverything(socket, bufferReader, bufferWriter);
+        }
+    }
+
     //en block operation IG, så den får sin egen thread så resten ikke holder stille mens den venter på den her
     //så du stadig selv kan sende beskeder men dens også venter på beskeder fra andre brugere
     public void listenForMessage(){
@@ -70,18 +103,25 @@ public class Client {
                 while (socket.isConnected()) {
                     try {
                         while (socket.isConnected() && (msgFromGroupChat = bufferReader.readLine()) != null) {
-
                             Message message = Parser.parseFromProtocol(msgFromGroupChat);
 
-                            if (message != null) {
+                            // Tjekker først, om beskeden er gyldig OG om den er den specielle "grønt lys"-besked.
+                            if (message != null && message.getPayload().startsWith("START_UPLOAD::")) {
+                                // Deler beskeden op (f.eks. "START_UPLOAD::51234") for at få fat i portnummeret.
+                                String[] parts = message.getPayload().split("::");
+                                // Omdanner portnummeret fra tekst til et tal.
+                                int port = Integer.parseInt(parts[1]);
+                                // Starter selve fil-uploadet på den nye, midlertidige forbindelse.
+                                uploadFile(port, Client.this.pendingFilePath);
+                            } else if (message != null) {
                                 System.out.println(Parser.formatForDisplay(message));
                             } else {
-                                // Hvis ikke parsebar, vis rå tekst (fx room prompts)
                                 System.out.println(msgFromGroupChat);
                             }
                         }
                     } catch (IOException e) {
                         closeEverything(socket,bufferReader,bufferWriter);
+                        System.out.println("Forbindelse mistet");
                         break;
                     }
                 }
@@ -89,6 +129,27 @@ public class Client {
             //starter den så den kører, noget alla thread.start i serveren
         }); thread.start();
     }
+
+    private void uploadFile(int port, String filePath) { // Håndtere fil afsendelsen på en ny seperat forbindelse
+        if (filePath == null || filePath.isEmpty()) { // Tjekker at vi ved hvilken fil, eller om filepath er empty
+            System.out.println("Ingen fil er specificeret til upload.");
+            return;
+        }
+        System.out.println("Forbinder til midlertidig fil port " + port + " for at sende " + filePath);
+        try (Socket fileSocket = new Socket(socket.getInetAddress().getHostName(), port); // Opretter en forbindelse til midlertidig fil-port
+             OutputStream fileOut = fileSocket.getOutputStream()) {
+
+            byte[] fileBytes = Files.readAllBytes(Paths.get(filePath)); // Læser hele filen fra stien
+            fileOut.write(fileBytes);
+            System.out.println("Filen er sendt");
+
+        } catch (IOException e) {
+            System.out.println("Fejl under fil upload: " + e.getMessage());
+        } finally {
+            this.pendingFilePath = null;
+        }
+    }
+
     public void closeEverything(Socket socket, BufferedReader bufferReader, BufferedWriter bufferWriter) {
         try {
             if (bufferReader != null) {
