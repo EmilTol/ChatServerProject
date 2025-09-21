@@ -1,5 +1,6 @@
 package gang.gang.service;
 import gang.gang.entity.Message;
+import gang.gang.entity.MessageType;
 import gang.gang.entity.User;
 import gang.gang.protocol.Parser;
 
@@ -49,7 +50,7 @@ public class ClientHandler implements Runnable {
 
             //udskriver en ny bruger et ankommet
 //            broadcastMessage("SERVER: " + clientUsername + " has entered the chat!");
-            Message welcomeMessage = new Message("SERVER", LocalDateTime.now(), "SERVER_INFO",
+            Message welcomeMessage = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO,
                     username + " has entered the chat");
             messageService.sendMessageToRoom(roomName, Parser.formatToProtocol(welcomeMessage), this);
 //            broadcastMessage(Parser.formatToProtocol(welcomeMessage));
@@ -130,7 +131,7 @@ public class ClientHandler implements Runnable {
     //bruger bliver fjernet fra arraylist
     public void removeClientHandler() {
         try {
-            Message byebyeMessage = new Message("Server", LocalDateTime.now(), "SERVER_INFO",
+            Message byebyeMessage = new Message("Server", LocalDateTime.now(), MessageType.SERVER_INFO,
                     user.getUsername() + " has left the chat");
             messageService.sendMessageToRoom(roomName, Parser.formatToProtocol(byebyeMessage), this);
 
