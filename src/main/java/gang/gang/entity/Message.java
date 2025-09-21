@@ -6,10 +6,10 @@ public class Message {
     private String clientId;
 //    private String message;
     private LocalDateTime timestamp;
-    private String messageType;
+    private MessageType messageType;
     private String payload;
 
-    public Message(String clientId, LocalDateTime timestamp, String messageType, String payload) {
+    public Message(String clientId, LocalDateTime timestamp, MessageType messageType, String payload) {
         this.clientId = clientId;
 //        this.message = message;
         this.timestamp = timestamp;
@@ -25,7 +25,7 @@ public class Message {
     public LocalDateTime getTimestamp() {
         return timestamp;
     }
-    public String getMessageType() {
+    public MessageType getMessageType() {
         return messageType;
     }
     public String getPayload() {
