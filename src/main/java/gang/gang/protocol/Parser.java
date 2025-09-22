@@ -38,7 +38,7 @@ public class Parser {
                 if (fileInfo.length == 2) {
                     String fileName = fileInfo[0];
                     String fileSize = fileInfo[1];
-                    return String.format("[%s] [FILE] %s sender fil: %s (%s bytes)", time, message.getClientId(), fileName, fileSize);
+                    return String.format("[%s] [FILE] %s: %s (%s bytes)", time, message.getClientId(), fileName, fileSize);
                 } else {
                     return String.format("[%s] [FILE] %s startede en filoverførsel.", time, message.getClientId());
                 }
