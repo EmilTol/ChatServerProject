@@ -3,6 +3,7 @@ package gang.gang.service;
 import gang.gang.entity.Command;
 import gang.gang.entity.Message;
 import gang.gang.entity.MessageType;
+import gang.gang.service.EmojiService;
 import gang.gang.net.Client;
 
 import java.io.File;
@@ -13,9 +14,11 @@ import java.util.Optional;
 public class CommandService {
 
     private final Client client;
+    private final EmojiService emojiService;
 
-    public CommandService(Client client) {
+    public CommandService(Client client, EmojiService emojiService) {
         this.client = client;
+        this.emojiService = emojiService;
     }
 
     public void execute(String commandInput) { // Er metoden som skal holde styr på om det er en kommando eller ikke
@@ -33,6 +36,12 @@ public class CommandService {
                 String filePath = fullInput.substring(command.getCommand().length()).trim(); //Adskiller kommandoen fra filstien
                 handleSendFile(filePath); // Kalder metoden for at sende filen
                 break;
+
+            case EMOJI:
+                System.out.println("Nuværende Emojis");
+                emojiService.getAllEmojis();
+                break;
+
             default:
                 System.out.println("Kommandoen '" + command.getCommand() + "' er ikke implementeret endnu.");
                 break;

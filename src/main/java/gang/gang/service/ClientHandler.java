@@ -131,6 +131,9 @@ public class ClientHandler implements Runnable {
                     case TEXT:
                         messageService.sendMessageToRoom(roomName, messageFromClient, this);
                         break;
+                    case EMOJI:
+                        messageService.sendMessageToRoom(roomName, messageFromClient, this);
+                        break;
                     case FILE_TRANSFER: // Håndtere filoverførsel i en ny tråd, så det ikke fucker med chatten ( den smed brugeren ud hvis man ikke gør det )
                         new Thread(() -> handleFileTransferRequest(message)).start();
                         break;

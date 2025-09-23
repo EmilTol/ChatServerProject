@@ -7,7 +7,8 @@ public enum Command {
     SEND_FILE("/sendfile"),
     DIRECTMESSAGE("/dm"),
     USERS("/users"),
-    JOIN_ROOM("/join");
+    JOIN_ROOM("/join"),
+    EMOJI("/emoji");
 
     private final String command;
     Command(String command) {

@@ -31,6 +31,8 @@ public class Parser {
         switch (message.getMessageType()) { // Tjekker vores messageType og formaterer den så det passer med typen
             case TEXT: // Normale beskeder
                 return String.format("[%s] [%s] %s: %s", time, message.getMessageType(), message.getClientId(), message.getPayload());
+            case EMOJI:
+                return String.format("[%s] [%s] %s: %s", time, message.getMessageType(), message.getClientId(), message.getPayload());
             case SERVER_INFO: // Server beskeder, f.eks hvis en person tilslutter
                 return String.format("(:  %s  :)", message.getPayload());
             case FILE_TRANSFER: // File overførsel, specielt ved den er at den deler payload i 2, navn og størrelse

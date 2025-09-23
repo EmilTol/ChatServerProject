@@ -1,10 +1,13 @@
 package gang.gang.net;
+import gang.gang.entity.Emoji;
 import gang.gang.entity.Message;
 import gang.gang.entity.MessageType;
 import gang.gang.entity.User;
 import gang.gang.protocol.Parser;
 import gang.gang.service.ClientHandler;
 import gang.gang.service.CommandService;
+import gang.gang.service.EmojiService;
+
 
 import java.io.*;
 import java.net.Socket;
@@ -21,6 +24,7 @@ public class Client {
     private User user;
     private CommandService commandService;
     private String pendingFilePath;
+    private EmojiService emojiService;
 
     public Client(Socket socket, User user) {
         try {
@@ -30,7 +34,9 @@ public class Client {
             this.bufferWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
             this.bufferReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-            this.commandService = new CommandService(this);
+            Emoji emoji = new Emoji();
+            this.emojiService = new EmojiService(emoji);
+            this.commandService = new CommandService(this, new EmojiService(emoji));
 
 
         } catch (IOException e) {
@@ -66,7 +72,11 @@ public class Client {
                 String input = scanner.nextLine();
                 if (input.startsWith("/")) {
                     commandService.execute(input);
-                } else {
+                } else if (input.startsWith(":") && input.endsWith(":")) {
+                    String emojiPayload = emojiService.getChosenEmoji(input); // returnerer selve emoji’en eller ❓
+                    Message message = new Message(user.getUsername(), LocalDateTime.now(), MessageType.EMOJI, emojiPayload);
+                    sendProtocolMessage(message);
+                }else {
                     Message message = new Message(user.getUsername(), LocalDateTime.now(), MessageType.TEXT, input);
                     sendProtocolMessage(message);
                 }
