@@ -24,7 +24,9 @@ public class EmojiService {
         if (emoji.hasEmoji(input)) {
             return emoji.getEmojiByName(input);
         } else {
-            return"Emoji findes ikke!!";
+            System.out.println("Emoji findes ikke");
+            input = null;
+            return input;
         }
 
     }

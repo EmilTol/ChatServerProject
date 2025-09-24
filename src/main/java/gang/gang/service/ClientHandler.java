@@ -123,7 +123,7 @@ public class ClientHandler implements Runnable {
             String messageFromClient;
             while ((messageFromClient = bufferedReader.readLine()) != null) { //Løkke der køre og forsætter så længe klienten er forbundet og sender beskerder
                 Message message = Parser.parseFromProtocol(messageFromClient); // Omdanner beskedet til et struktureret besked objekt
-                if ( message == null){
+                if ( message == null || message.getPayload() == null || message.getPayload().trim().isEmpty()){
                     System.out.println("Modtog ugyldig besked fra: " + user.getUsername());
                     continue;
                 }

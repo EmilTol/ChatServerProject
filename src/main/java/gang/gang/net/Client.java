@@ -74,8 +74,11 @@ public class Client {
                     commandService.execute(input);
                 } else if (input.startsWith(":") && input.endsWith(":")) {
                     String emojiPayload = emojiService.getChosenEmoji(input); // returnerer selve emoji’en eller ❓
-                    Message message = new Message(user.getUsername(), LocalDateTime.now(), MessageType.EMOJI, emojiPayload);
-                    sendProtocolMessage(message);
+                    //OKAY den her er her, fordi nogle ting konverter min null til en string der hedder Null så laver tjek her i stedet for clientHandler
+                    if (emojiPayload != null) {
+                        Message message = new Message(user.getUsername(), LocalDateTime.now(), MessageType.EMOJI, emojiPayload);
+                        sendProtocolMessage(message);
+                    }
                 }else {
                     Message message = new Message(user.getUsername(), LocalDateTime.now(), MessageType.TEXT, input);
                     sendProtocolMessage(message);
@@ -88,6 +91,7 @@ public class Client {
 
     public void sendProtocolMessage(Message message) { //Hjælpe metode til at sende beskeder
         try {
+
             // Omdanner det strukturerede Message-objekt til en simpel tekststreng (f.eks. "bruger|tid|TEKST|hej").
             String formattedMessage = Parser.formatToProtocol(message);
             // Skriver den formaterede streng til vores output-buffer.
