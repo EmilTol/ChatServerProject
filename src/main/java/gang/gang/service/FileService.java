@@ -1,6 +1,8 @@
 package gang.gang.service;
 
 import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class FileService {
     private static final String UPLOAD_DIRECTORY = "FileUploads"; // navnet på mappe hvor filen skal sendes
@@ -22,5 +24,43 @@ public class FileService {
                 totalBytesRead += bytesRead;
             }
         }
+    }
+    public List <String> getAvailableFiles() {
+        File uploadDir = new File(UPLOAD_DIRECTORY);
+
+        if (!uploadDir.exists() || !uploadDir.isDirectory()) { // Tjekker om mappen findes og faktisk er en mappe
+            return new ArrayList<>(); // Returnerer tom liste hvis mappen ikke findes
+        }
+        List<String> files = new ArrayList<>();
+        File[] fileArray = uploadDir.listFiles(); // Henter alle filer og mapper i directory
+        if (fileArray != null) { // listFiles() kan returnere null hvis der er adgangsproblemer
+            for (File file : fileArray) {
+                if (file.isFile()) { // Springer mapper over, kun filer
+                    files.add(file.getName()); // Tilføjer kun filnavnet, ikke den fulde sti
+                }
+            }
+        }
+        return files;
+    }
+
+    public void sendFile(OutputStream outputStream, String fileName) throws IOException {
+        File file = new File(UPLOAD_DIRECTORY, fileName);
+        try (FileInputStream fileInputStream = new FileInputStream(file)) {
+            byte[] buffer = new byte[4096]; // Buffer til at læse filen
+            int bytesRead;
+            while ((bytesRead = fileInputStream.read(buffer)) != -1) { // Læser fra fil og skriver direkte til outputStream, altså vores client
+                outputStream.write(buffer, 0, bytesRead); // Skriver kun det antal bytes vi faktisk læste
+            }
+        }
+    }
+
+    public boolean fileExists(String fileName) {
+        File file = new File(UPLOAD_DIRECTORY, fileName);
+        return file.exists() && file.isFile(); // Tjekker både at den findes og er en fil
+    }
+
+    public long getFileSize(String fileName) {
+        File file = new File(UPLOAD_DIRECTORY, fileName);
+        return file.length(); // Returnerer filstørrelse i bytes
     }
 }

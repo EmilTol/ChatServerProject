@@ -137,6 +137,13 @@ public class ClientHandler implements Runnable {
                     case FILE_TRANSFER: // Håndtere filoverførsel i en ny tråd, så det ikke fucker med chatten ( den smed brugeren ud hvis man ikke gør det )
                         new Thread(() -> handleFileTransferRequest(message)).start();
                         break;
+                    case FILE_DOWNLOAD:
+                        if (message.getPayload().equals("LIST_FILES")) {
+                            handleListFilesRequest();
+                        } else {
+                            new Thread(() -> handleFileDownloadRequest(message)).start();
+                        }
+                        break;
 
                     default:
                         System.out.println("Modtog ugyldig besked :( " + message.getMessageType());
@@ -181,6 +188,49 @@ public class ClientHandler implements Runnable {
             Message errorMsg = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO, "Filoverførsel fejlede for " + user.getUsername());
             this.sendMessage(Parser.formatToProtocol(errorMsg)); // send besked til brugeren om at det fejlede
         }
+    }
+    private void handleFileDownloadRequest(Message request) {
+        String fileName = request.getPayload();
+
+        if (!fileService.fileExists(fileName)) { // Tjekker om filen findes før vi forsøger at sende den
+            Message errorMsg = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO, "Fil ikke fundet: " + fileName);
+            this.sendMessage(Parser.formatToProtocol(errorMsg)); // Sender fejlbesked kun til den anmodende klient
+            return;
+        }
+
+        try (ServerSocket tempServerSocket = new ServerSocket(0)) { // Windows giver os en ledig port da vi skriver 0
+            int port = tempServerSocket.getLocalPort(); // Tager den port vi får givet af windows
+            long fileSize = fileService.getFileSize(fileName);
+
+            // Send en "grønt lys" besked tilbage til kun den anmodende klient
+            Message startDownload = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO, "START_DOWNLOAD::" + port);
+            this.sendMessage(Parser.formatToProtocol(startDownload));
+
+            tempServerSocket.setSoTimeout(10000); // 10 sekunders timer, hvor længe vi venter på klienten forbinder
+
+            try (Socket fileSocket = tempServerSocket.accept()) { // Accepterer den nye forbindelse fra klienten
+                System.out.println("Sender fil '" + fileName + "' til " + user.getUsername());
+                fileService.sendFile(fileSocket.getOutputStream(), fileName); // Smider ansvaret over til fileService
+
+                // Sender til hele rummet at filen blev downloadet, skal opdatere så vi ikke bruger server_info parser til det
+                Message confirmation = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO, user.getUsername() + " downloadede " + fileName);
+                messageService.sendMessageToRoom(roomName, Parser.formatToProtocol(confirmation), this);
+            }
+
+        } catch (IOException e) {
+            System.out.println("Fejl under download: " + e.getMessage()); // Hvis noget går galt, f.eks timeout
+            Message errorMsg = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO, "Download fejlede for " + fileName);
+            this.sendMessage(Parser.formatToProtocol(errorMsg)); // Send besked til brugeren om at det fejlede
+        }
+    }
+
+    private void handleListFilesRequest() {
+        List<String> files = fileService.getAvailableFiles(); // Henter alle tilgængelige filer fra FileUploads
+        String filesList = String.join(",", files); // Sammensætter filnavnene med kommaer imellem
+
+        // Sender fillisten tilbage til den anmodende klient
+        Message filesResponse = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO, "FILES_LIST::" + filesList);
+        this.sendMessage(Parser.formatToProtocol(filesResponse)); // Kun til denne klient, ikke hele rummet
     }
 
     public void sendMessage(String message) {

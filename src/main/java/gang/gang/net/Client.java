@@ -4,7 +4,6 @@ import gang.gang.entity.Message;
 import gang.gang.entity.MessageType;
 import gang.gang.entity.User;
 import gang.gang.protocol.Parser;
-import gang.gang.service.ClientHandler;
 import gang.gang.service.CommandService;
 import gang.gang.service.EmojiService;
 
@@ -25,6 +24,7 @@ public class Client {
     private CommandService commandService;
     private String pendingFilePath;
     private EmojiService emojiService;
+    private String pendingDownloadFilePath;
 
     public Client(Socket socket, User user) {
         try {
@@ -104,7 +104,7 @@ public class Client {
 
     //en block operation IG, så den får sin egen thread så resten ikke holder stille mens den venter på den her
     //så du stadig selv kan sende beskeder men dens også venter på beskeder fra andre brugere
-    public void listenForMessage(){
+    public void listenForMessage() {
         Thread thread = new Thread(new Runnable() { // Opførte sig funky, virker nu, men ved ikke hvorfor
             @Override
             public void run() {
@@ -123,6 +123,21 @@ public class Client {
                                 int port = Integer.parseInt(parts[1]);
                                 // Starter selve fil-uploadet på den nye, midlertidige forbindelse.
                                 uploadFile(port, Client.this.pendingFilePath);
+                            } else if (message != null && message.getPayload().startsWith("START_DOWNLOAD::")) { // Stortset same shit som med upload
+                                String[] parts = message.getPayload().split("::");
+                                int port = Integer.parseInt(parts[1]);
+                                downloadFile(port, Client.this.pendingDownloadFilePath);
+                            } else if (message != null && message.getPayload().startsWith("FILES_LIST::")) { // Serveren sender os en liste over tilgængelige filer
+                                String filesList = message.getPayload().substring("FILES_LIST::".length());
+                                if (filesList.isEmpty()) {
+                                    System.out.println("Ingen filer fundet");
+                                } else {
+                                    String[] files = filesList.split(","); // Deler fillisten op ved kommaer
+                                    // Udskriver hver fil med et bindesteg foran for at gøre det lidt mere nice xD
+                                    for (String file : files) {
+                                        System.out.println("- " + file);
+                                    }
+                                }
                             } else if (message != null) {
                                 System.out.println(Parser.formatForDisplay(message));
                             } else {
@@ -130,14 +145,15 @@ public class Client {
                             }
                         }
                     } catch (IOException e) {
-                        closeEverything(socket,bufferReader,bufferWriter);
+                        closeEverything(socket, bufferReader, bufferWriter);
                         System.out.println("Forbindelse mistet");
                         break;
                     }
                 }
             }
             //starter den så den kører, noget alla thread.start i serveren
-        }); thread.start();
+        });
+        thread.start();
     }
 
     private void uploadFile(int port, String filePath) { // Håndtere fil afsendelsen på en ny seperat forbindelse
@@ -157,6 +173,38 @@ public class Client {
             System.out.println("Fejl under fil upload: " + e.getMessage());
         } finally {
             this.pendingFilePath = null;
+        }
+    }
+    private void downloadFile(int port, String fileName) { // Håndtere fil download på en ny seperat forbindelse
+        if ( fileName == null || fileName.isEmpty()) { // Tjekker at vi ved hvilken fil, eller om fileName er empty
+            System.out.println("ingen fil er specificeret til download");
+            return;
+        }
+
+        System.out.println("Forbinder til midlertidig fil port " + port + " for at hente " + fileName);
+
+        // Opretter Downloads mappe hvis den ikke findes
+        File downloadDir = new File("Downloads");
+        if (!downloadDir.exists()) {
+            downloadDir.mkdir();
+        }
+
+        try (Socket fileSocket = new Socket(socket.getInetAddress().getHostName(), port); // Opretter en forbindelse til midlertidig download-port
+             InputStream fileIn = fileSocket.getInputStream(); // Stream til at læse data fra serveren
+             FileOutputStream fileOut = new FileOutputStream(new File(downloadDir, fileName))) { // Stream til at skrive til lokal fil
+
+            byte[] buffer = new byte[4096]; // Buffer til at holde data chunks (4KB ad gangen)
+            int bytesRead;
+            // Læser data fra serveren og skriver til lokal fil, stopper når der ikke er mere data (-1)
+            while ((bytesRead = fileIn.read(buffer)) != -1) {
+                fileOut.write(buffer, 0, bytesRead); // Skriver kun det antal bytes vi faktisk læste
+            }
+            System.out.println("Fil downloadet: " + fileName);
+
+        } catch (IOException e) {
+            System.out.println("Download fejlede: " + e.getMessage());
+        } finally {
+            this.pendingDownloadFilePath = null; // Rydder op efter download, uanset om det lykkedes eller fejlede
         }
     }
 
@@ -191,6 +239,10 @@ public class Client {
         //begge er "blocking operations" fordi de har infinite while-loops, men de er hver deres thread så ja :D
         client.listenForMessage();
         client.sendMessage();
+    }
+
+    public void setPendingDownloadFilePath(String fileName) {
+        this.pendingDownloadFilePath = fileName;
     }
 
 }

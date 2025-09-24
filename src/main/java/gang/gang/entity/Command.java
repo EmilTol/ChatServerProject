@@ -8,7 +8,9 @@ public enum Command {
     DIRECTMESSAGE("/dm"),
     USERS("/users"),
     JOIN_ROOM("/join"),
-    EMOJI("/emoji");
+    EMOJI("/emoji"),
+    DOWNLOAD("/download"),
+    FILES("/files");
 
     private final String command;
     Command(String command) {
