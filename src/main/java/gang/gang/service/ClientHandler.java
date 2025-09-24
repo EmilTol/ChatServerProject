@@ -62,48 +62,48 @@ public class ClientHandler implements Runnable {
 //            messageService.sendMessageToRoom(roomName, Parser.formatToProtocol(welcomeMessage), this);
 ////            broadcastMessage(Parser.formatToProtocol(welcomeMessage));
 
-        // blev nødt til at flytte det væk herfra da det blokerede for at andre kunne tilslutte et rum.
+            // blev nødt til at flytte det væk herfra da det blokerede for at andre kunne tilslutte et rum.
 
         } catch (IOException e) {
             closeEverything(socket, bufferedReader, bufferedWriter);
         }
     }
 
-        private void selectRoom() throws IOException {
-            while (true) {
-                bufferedWriter.write("Join a room");
-                bufferedWriter.newLine();
+    private void selectRoom() throws IOException {
+        while (true) {
+            bufferedWriter.write("Join a room");
+            bufferedWriter.newLine();
 
-                //looper igennem rum og udskriver til bruger
-                for (Map.Entry<String,Integer> entry : roomService.getRoomStatus().entrySet()) {
+            //looper igennem rum og udskriver til bruger
+            for (Map.Entry<String,Integer> entry : roomService.getRoomStatus().entrySet()) {
                 String roomName = entry.getKey();
                 int count = entry.getValue();
                 bufferedWriter.write(String.format("%s (%d/%d)",roomName, count, roomService.getMaxRoomSize()));
                 bufferedWriter.newLine();
-                }
+            }
 
-                bufferedWriter.write("Enter room name: ");
+            bufferedWriter.write("Enter room name: ");
+            bufferedWriter.newLine();
+            bufferedWriter.flush();
+
+            String chosenRoom = bufferedReader.readLine();
+
+            System.out.println("DEBUG: chosenRoom = " + chosenRoom);
+
+            if (chosenRoom != null) chosenRoom = chosenRoom.trim();
+
+            if (roomService.addClientToRoom(chosenRoom, this)) {
+                this.roomName = chosenRoom;
+                break;
+            }
+            else {
+                bufferedWriter.write("Room is full or does not exist, Choose another.");
                 bufferedWriter.newLine();
                 bufferedWriter.flush();
-
-                String chosenRoom = bufferedReader.readLine();
-
-                System.out.println("DEBUG: chosenRoom = " + chosenRoom);
-
-                if (chosenRoom != null) chosenRoom = chosenRoom.trim();
-
-                if (roomService.addClientToRoom(chosenRoom, this)) {
-                    this.roomName = chosenRoom;
-                    break;
-                }
-                else {
-                    bufferedWriter.write("Room is full or does not exist, Choose another.");
-                    bufferedWriter.newLine();
-                    bufferedWriter.flush();
-                }
-
             }
+
         }
+    }
 
 //messageService.sendMessageToRoom(roomName, messageFromClient, this);
 
@@ -135,13 +135,13 @@ public class ClientHandler implements Runnable {
                         messageService.sendMessageToRoom(roomName, messageFromClient, this);
                         break;
                     case FILE_TRANSFER: // Håndtere filoverførsel i en ny tråd, så det ikke fucker med chatten ( den smed brugeren ud hvis man ikke gør det )
-                        new Thread(() -> handleFileTransferRequest(message)).start();
+                        new Thread(() -> fileService.handleFileTransferRequest(message, user.getUsername(), roomName, this, messageService)).start();
                         break;
                     case FILE_DOWNLOAD:
                         if (message.getPayload().equals("LIST_FILES")) {
-                            handleListFilesRequest();
+                            fileService.handleListFilesRequest(user.getUsername(), this);
                         } else {
-                            new Thread(() -> handleFileDownloadRequest(message)).start();
+                            new Thread(() -> fileService.handleFileDownloadRequest(message, user.getUsername(), roomName, this, messageService)).start();
                         }
                         break;
 
@@ -154,95 +154,23 @@ public class ClientHandler implements Runnable {
             String username = (user != null && user.getUsername() != null) ? user.getUsername() : "en ny klient";
             System.out.println("Forbindelsen til " + username + " blev afbrudt.");
         }  finally {
-        // Fjerner klienten fra rummet og sender farvel-besked
-        removeClientHandler();
-    }
-
-
-    }
-
-    private void handleFileTransferRequest(Message requestMessage) {
-        try (ServerSocket tempServerSocket = new ServerSocket(0)) { // Sygt smart, windows giver os en ledig port da vi skriver 0. Så vi behøver ikke tage stilling til det.
-            int port = tempServerSocket.getLocalPort(); // tager den port vi får givet af windows
-            String[] fileInfo = requestMessage.getPayload().split("\\|"); // deler vores payload i 2, ja, vi gør det 2 steder, fixer på et andet tidspunkt.
-            String fileName = fileInfo[0];
-            long fileSize = Long.parseLong(fileInfo[1]);
-
-            // Send en "grønt lys" besked tilbage til KUN den anmodende klient
-            Message goAheadMessage = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO, "START_UPLOAD::" + port);
-            this.sendMessage(Parser.formatToProtocol(goAheadMessage));
-
-
-            tempServerSocket.setSoTimeout(10000); // 10 sekunders timer, som beskriver hvor længe vi vil vente på klienten forbinder til den nye port.
-
-            try (Socket fileSocket = tempServerSocket.accept()) { // Acceptere den nye forbindelse fra klienten
-                System.out.println("Modtager fil '" + fileName + "' på midlertidig port " + port);
-                fileService.receiveFile(fileSocket.getInputStream(), fileName, fileSize); // smider ansvaret over til fileService
-
-                Message confirmation = new Message(user.getUsername(), LocalDateTime.now(), MessageType.FILE_TRANSFER, fileName + "|" + fileSize); //Semder til hele rummet at filen er sendt
-                messageService.sendMessageToRoom(roomName, Parser.formatToProtocol(confirmation), this);
-            }
-
-        } catch (IOException e) {
-            System.out.println("Fejl under oprettelse af midlertidig fil-server: " + e.getMessage()); // his noget går galt, f.eks timeout
-            Message errorMsg = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO, "Filoverførsel fejlede for " + user.getUsername());
-            this.sendMessage(Parser.formatToProtocol(errorMsg)); // send besked til brugeren om at det fejlede
-        }
-    }
-    private void handleFileDownloadRequest(Message request) {
-        String fileName = request.getPayload();
-
-        if (!fileService.fileExists(fileName)) { // Tjekker om filen findes før vi forsøger at sende den
-            Message errorMsg = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO, "Fil ikke fundet: " + fileName);
-            this.sendMessage(Parser.formatToProtocol(errorMsg)); // Sender fejlbesked kun til den anmodende klient
-            return;
+            // Fjerner klienten fra rummet og sender farvel-besked
+            removeClientHandler();
         }
 
-        try (ServerSocket tempServerSocket = new ServerSocket(0)) { // Windows giver os en ledig port da vi skriver 0
-            int port = tempServerSocket.getLocalPort(); // Tager den port vi får givet af windows
-            long fileSize = fileService.getFileSize(fileName);
 
-            // Send en "grønt lys" besked tilbage til kun den anmodende klient
-            Message startDownload = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO, "START_DOWNLOAD::" + port);
-            this.sendMessage(Parser.formatToProtocol(startDownload));
-
-            tempServerSocket.setSoTimeout(10000); // 10 sekunders timer, hvor længe vi venter på klienten forbinder
-
-            try (Socket fileSocket = tempServerSocket.accept()) { // Accepterer den nye forbindelse fra klienten
-                System.out.println("Sender fil '" + fileName + "' til " + user.getUsername());
-                fileService.sendFile(fileSocket.getOutputStream(), fileName); // Smider ansvaret over til fileService
-
-                // Sender til hele rummet at filen blev downloadet, skal opdatere så vi ikke bruger server_info parser til det
-                Message confirmation = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO, user.getUsername() + " downloadede " + fileName);
-                messageService.sendMessageToRoom(roomName, Parser.formatToProtocol(confirmation), this);
-            }
-
-        } catch (IOException e) {
-            System.out.println("Fejl under download: " + e.getMessage()); // Hvis noget går galt, f.eks timeout
-            Message errorMsg = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO, "Download fejlede for " + fileName);
-            this.sendMessage(Parser.formatToProtocol(errorMsg)); // Send besked til brugeren om at det fejlede
-        }
-    }
-
-    private void handleListFilesRequest() {
-        List<String> files = fileService.getAvailableFiles(); // Henter alle tilgængelige filer fra FileUploads
-        String filesList = String.join(",", files); // Sammensætter filnavnene med kommaer imellem
-
-        // Sender fillisten tilbage til den anmodende klient
-        Message filesResponse = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO, "FILES_LIST::" + filesList);
-        this.sendMessage(Parser.formatToProtocol(filesResponse)); // Kun til denne klient, ikke hele rummet
     }
 
     public void sendMessage(String message) {
 
-            try {
-                    bufferedWriter.write(message);
-                    bufferedWriter.newLine();
-                    bufferedWriter.flush();
+        try {
+            bufferedWriter.write(message);
+            bufferedWriter.newLine();
+            bufferedWriter.flush();
 
-            } catch (IOException e) {
-                closeEverything(socket,null,bufferedWriter);
-            }
+        } catch (IOException e) {
+            closeEverything(socket,null,bufferedWriter);
+        }
 
     }
     //bruger bliver fjernet fra arraylist
@@ -284,5 +212,4 @@ public class ClientHandler implements Runnable {
             e.printStackTrace();
         }
     }
-
 }
