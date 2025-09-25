@@ -14,10 +14,14 @@ public class CommandService {
     private final Client client;
     private final EmojiService emojiService;
 
+
+
     public CommandService(Client client, EmojiService emojiService) {
         this.client = client;
         this.emojiService = emojiService;
+
     }
+
 
     public void execute(String commandInput) { // Er metoden som skal holde styr på om det er en kommando eller ikke
 //        System.out.println("kommando" + commandInput);
@@ -37,10 +41,21 @@ public class CommandService {
                 break;
 
             case EMOJI:
-                System.out.println("Nuværende Emojis");
+                System.out.println("Current Emojis");
                 emojiService.getAllEmojis();
                 break;
 
+            case JOIN_ROOM:
+                System.out.println("Something something changing roomes");
+                break;
+
+            case USERS:
+                System.out.println("Alle brugere");
+                break;
+            case DIRECTMESSAGE:
+                String message = fullInput.substring(command.getCommand().length()).trim();
+                handleDirectMessage(message);
+                break;
             case DOWNLOAD:
                 String fileName = fullInput.substring(command.getCommand().length()).trim();
                 handleDownloadFile(fileName);

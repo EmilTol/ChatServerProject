@@ -6,6 +6,7 @@ import gang.gang.entity.User;
 import gang.gang.protocol.Parser;
 import gang.gang.service.CommandService;
 import gang.gang.service.EmojiService;
+import gang.gang.service.RoomService;
 
 
 import java.io.*;
@@ -26,10 +27,12 @@ public class Client {
     private EmojiService emojiService;
     private String pendingDownloadFilePath;
 
+
     public Client(Socket socket, User user) {
         try {
             this.socket = socket;
             this.user = user;
+
 
             this.bufferWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
             this.bufferReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));

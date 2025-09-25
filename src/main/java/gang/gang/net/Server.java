@@ -3,6 +3,8 @@ package gang.gang.net;
 import gang.gang.service.ClientHandler;
 import gang.gang.service.MessageService;
 import gang.gang.service.RoomService;
+import gang.gang.entity.Room;
+import gang.gang.service.UserService;
 
 import java.io.IOException;
 import java.net.ServerSocket;

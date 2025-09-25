@@ -1,20 +1,18 @@
 package gang.gang.service;
 
 import gang.gang.entity.User;
+import gang.gang.entity.Room;
 
 import java.util.*;
 
 public class RoomService {
+    private Room room;
 
-    private final Map<String, List<ClientHandler>> rooms = new LinkedHashMap<>();
-    private final Map<String, User> onlineUsers = new HashMap<>();
-    private final int maxRoomSize = 5;
-
-    public RoomService() {
-        rooms.put("room1", new ArrayList<>());
-        rooms.put("room2", new ArrayList<>());
-        rooms.put("room3", new ArrayList<>());
+    public RoomService(Room room) {
+        this.room = room;
     }
+
+
 
     public synchronized boolean addClientToRoom(String roomName, ClientHandler clientHandler) {
         if (clientHandler == null && clientHandler.getUser() == null) {
@@ -36,25 +34,26 @@ public class RoomService {
     }
 
     public void removeClientFromRoom(String roomName, ClientHandler clientHandler) {
-        List<ClientHandler> clients = rooms.get(roomName);
-        if (clients != null)
-            clients.remove(clientHandler);
-        onlineUsers.remove(clientHandler.getUser().getUsername());
+        room.removeClientFromRoom(roomName, clientHandler);
+        if (clientHandler.getUser() != null) {
+        room.removeUserFromOnline(clientHandler.getUser().getUsername());
+        }
     }
 
     public List<ClientHandler> getClientsFromRoom(String roomName) {
-        return rooms.get(roomName);
+        return room.getRooms(roomName);
     }
 
     public Map <String, Integer> getRoomStatus() {
-        Map <String, Integer> status = new LinkedHashMap<>();
-        for (String roomName : rooms.keySet()) {
-            status.put(roomName, rooms.get(roomName).size());
+        Map<String, Integer> status = new LinkedHashMap<>();
+        for (String roomName : room.getRoomsNames()) {
+            List<ClientHandler> clients = room.getRooms(roomName);
+            status.put(roomName,clients.size());
         }
         return status;
+
     }
     public int getMaxRoomSize() {
-        return maxRoomSize;
+        return room.getMaxRoomSize();
     }
-
 }
