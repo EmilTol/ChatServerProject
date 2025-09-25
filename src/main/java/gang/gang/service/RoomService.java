@@ -17,29 +17,22 @@ public class RoomService {
     }
 
     public synchronized boolean addClientToRoom(String roomName, ClientHandler clientHandler) {
-        System.out.println("Debuging check af addClientToRoom ");
-        System.out.println("RoomName: " + roomName);
-        System.out.println("ClientHandler: " + (clientHandler != null ? clientHandler : "null"));
-
-        //listen for brugere i rummet
-        List<ClientHandler> clients = rooms.get(roomName);
+        if (clientHandler == null && clientHandler.getUser() == null) {
+            System.out.println("ClientHandler eller user er null!");
+            return false;
+        }
+        List<ClientHandler> clients = room.getRooms(roomName);
         System.out.println("brugere allerede i rummet: " + clients != null ? clients.size() : "null");
 
-        if (clients != null && clients.size() < maxRoomSize) {
-            //gemmer brugers clientHandler objekt, skal have adgang til socket for at sende beskeder
-            clients.add(clientHandler);
+        if (clients.size() < room.getMaxRoomSize()) {
+            room.addClientToRoom(roomName, clientHandler);
+            room.addUserToOnline(clientHandler.getUser());
             System.out.println("bruger tilføjet til rummet. room size: " + clients.size());
-
-            if (clientHandler != null && clientHandler.getUser() != null) {
-                String username = clientHandler.getUser().getUsername();
-                onlineUsers.put(username, clientHandler.getUser());
-                System.out.println("  --> onlineUsers opdateret med: " + username);
-            } else {
-                System.out.println("  [ADVARSEL] clientHandler eller user er null!");
-            }
             return true;
         }
+        System.out.println("Rummet er fyldt!");
         return false;
+
     }
 
     public void removeClientFromRoom(String roomName, ClientHandler clientHandler) {

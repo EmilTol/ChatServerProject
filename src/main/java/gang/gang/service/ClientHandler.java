@@ -32,13 +32,15 @@ public class ClientHandler implements Runnable {
     private RoomService roomService;
     private MessageService messageService;
     private FileService fileService;
+    private UserService userService;
 
-    public ClientHandler(Socket socket, RoomService roomService, MessageService messageService) {
+    public ClientHandler(Socket socket, RoomService roomService, MessageService messageService, UserService userService) {
         try {
             //gør at vores socket er ligemed hvad bliver sat til i serveren
             this.socket = socket;
             this.roomService = roomService;
             this.messageService = messageService;
+            this.userService = userService;
             this.fileService = new FileService();
 
             //outputStreamWriter er en character stream
@@ -46,23 +48,7 @@ public class ClientHandler implements Runnable {
             this.bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
             this.bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-            //sætter clientUsername som modtaget input fra bruger (deres første input)
-//            String username = bufferedReader.readLine();
             this.user = new User();
-//            this.user.setUsername(username);
-
-//            //tilføjer til arraylisten
-////            clientHandler.add(this);
-//            selectRoom();
-//
-//            //udskriver en ny bruger et ankommet
-////            broadcastMessage("SERVER: " + clientUsername + " has entered the chat!");
-//            Message welcomeMessage = new Message("SERVER", LocalDateTime.now(), MessageType.SERVER_INFO,
-//                    username + " has entered the chat");
-//            messageService.sendMessageToRoom(roomName, Parser.formatToProtocol(welcomeMessage), this);
-////            broadcastMessage(Parser.formatToProtocol(welcomeMessage));
-
-            // blev nødt til at flytte det væk herfra da det blokerede for at andre kunne tilslutte et rum.
 
         } catch (IOException e) {
             closeEverything(socket, bufferedReader, bufferedWriter);
@@ -105,15 +91,13 @@ public class ClientHandler implements Runnable {
         }
     }
 
-//messageService.sendMessageToRoom(roomName, messageFromClient, this);
-
-
     @Override
     public void run() {
         try {
             String username = bufferedReader.readLine(); // Læser brugerens input, hvilket er username
             if (username == null) {return;}
             this.user.setUsername(username);
+            userService.addUser(username,this);
             selectRoom(); //Starter selectRoom metode
 
             //Opretter og sender en velkomstbesked til brugeren
@@ -144,7 +128,16 @@ public class ClientHandler implements Runnable {
                             new Thread(() -> fileService.handleFileDownloadRequest(message, user.getUsername(), roomName, this, messageService)).start();
                         }
                         break;
+                    case PRIVATE:
+                        String[] privateParts = message.getPayload().split("\\|", 2);
+                        if (privateParts.length == 2){
+                            String targetUsername = privateParts[0];
+                            String privateMessageText = privateParts[1];
+                            Message formattedPrivateMessage = new Message (message.getClientId(), message.getTimestamp(), MessageType.PRIVATE, privateMessageText);
 
+                            messageService.sendPrivateMessage(message.getClientId(),targetUsername, Parser.formatToProtocol(formattedPrivateMessage), this);
+                            break;
+                        }
                     default:
                         System.out.println("Modtog ugyldig besked :( " + message.getMessageType());
                         break;
@@ -180,7 +173,7 @@ public class ClientHandler implements Runnable {
                     user.getUsername() + " has left the chat");
             messageService.sendMessageToRoom(roomName, Parser.formatToProtocol(byebyeMessage), this);
 
-
+            userService.removeUser(user.getUsername());
             roomService.removeClientFromRoom(roomName, this);
 
 

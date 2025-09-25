@@ -20,6 +20,7 @@ public class CommandService {
     }
 
     public void execute(String commandInput) { // Er metoden som skal holde styr på om det er en kommando eller ikke
+//        System.out.println("kommando" + commandInput);
         Optional<Command> foundCommand = Command.fromString(commandInput); //Prøver at matche input med en kommando
         if (foundCommand.isPresent()) { // tjekker og køre hvis vi kender kommandoen
             run(foundCommand.get(), commandInput);
@@ -93,5 +94,19 @@ public class CommandService {
         // Sender en speciel besked med "LIST_FILES" som payload for at få filliste
         Message fileRequest = new Message(client.getUser().getUsername(),LocalDateTime.now(),MessageType.FILE_DOWNLOAD,"LIST_FILES");
         client.sendProtocolMessage(fileRequest); // Bruger samme message type som download, men med specielt payload
+    }
+
+    private void handleDirectMessage(String input) {
+        String[] parts = input.split(" ", 2);
+        if (parts.length < 2) {
+            System.out.println("Do /dm (username) (message)");
+            return;
+        }
+
+        String targetUsername = parts[0];
+        String messageText = parts[1];
+
+        Message privateMessage = new Message(client.getUser().getUsername(), LocalDateTime.now(), MessageType.PRIVATE, targetUsername + "|" + messageText);
+        client.sendProtocolMessage(privateMessage);
     }
 }

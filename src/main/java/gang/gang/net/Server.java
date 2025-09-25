@@ -10,8 +10,10 @@ import java.net.Socket;
 
 public class Server {
     private ServerSocket serverSocket;
-    RoomService roomService = new RoomService();
-    MessageService messageService = new MessageService(roomService);
+    private Room room = new Room();
+    RoomService roomService = new RoomService(room);
+    UserService userService = new UserService();
+    MessageService messageService = new MessageService(roomService, userService);
 
     public Server(ServerSocket serverSocket) {
         this.serverSocket = serverSocket;
@@ -28,7 +30,7 @@ public class Server {
                 System.out.println("A new client has connected :) " + socket.getInetAddress());
 
                 //hvert objekt af denne klasse kommunikere med en bruger
-                ClientHandler clientHandler = new ClientHandler(socket, roomService, messageService);
+                ClientHandler clientHandler = new ClientHandler(socket, roomService, messageService, userService);
 
                 Thread thread = new Thread(clientHandler);
                 thread.start();

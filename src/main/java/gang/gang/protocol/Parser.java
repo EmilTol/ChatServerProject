@@ -44,6 +44,8 @@ public class Parser {
                 } else {
                     return String.format("[%s] [FILE] %s startede en filoverførsel.", time, message.getClientId());
                 }
+            case PRIVATE:
+                return String.format("[%s] [PRIVATE] %s: %s", time, message.getClientId(), message.getPayload());
             default:
                 return "Ukendt beskedformat";
         }
